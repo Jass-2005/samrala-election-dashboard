@@ -1,139 +1,134 @@
 import React from 'react';
-import { 
-  LayoutDashboard, 
-  Layers, 
-  MapPin, 
-  FileSpreadsheet, 
-  FileText, 
-  ShieldCheck, 
-  X
-} from 'lucide-react';
+import { LayoutDashboard, MapPin, Users, FileSpreadsheet, ExternalLink, X, Download } from 'lucide-react';
+import { CONSTITUENCIES } from '../data/constituencies';
+import { t } from '../utils/translations';
 
 export default function Sidebar({ 
   activeTab, 
   setActiveTab, 
-  mobileMenuOpen, 
-  setMobileMenuOpen,
-  onOpenAudit,
-  t
+  isOpen, 
+  onClose,
+  constituencyId,
+  language
 }) {
+  const currentConst = CONSTITUENCIES[constituencyId] || CONSTITUENCIES.SAMRALA;
+
   const handleNavClick = (tab) => {
     setActiveTab(tab);
-    if (setMobileMenuOpen) setMobileMenuOpen(false);
+    if (onClose) onClose();
   };
 
   return (
     <>
-      {/* Mobile Backdrop */}
-      {mobileMenuOpen && (
+      {/* Mobile Drawer Backdrop */}
+      {isOpen && (
         <div 
-          className="sidebar-backdrop" 
-          onClick={() => setMobileMenuOpen(false)}
-          aria-hidden="true"
+          className="mobile-sidebar-backdrop no-print" 
+          onClick={onClose} 
+          aria-label="Close Mobile Navigation" 
         />
       )}
 
-      <aside className={`app-sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
-        {/* Sidebar Header */}
-        <div className="sidebar-brand">
-          <div className="brand-logo-wrap">
+      <aside className={`dsidein-sidebar no-print ${isOpen ? 'mobile-open' : ''}`}>
+        {/* Top Logo & Close button on mobile */}
+        <div className="sidebar-logo-wrap">
+          <a 
+            href="https://dsidein.com/samrala-2022-2024" 
+            title={`Dsidein Command Center — ${currentConst.name_en}`}
+            className="sidebar-brand-link"
+          >
             <img 
               src="./dsidein_logo_transparent.png" 
               alt="Dsidein Logo" 
-              className="brand-logo-img"
-              onError={(e) => {
-                e.target.style.display = 'none';
-              }}
+              className="sidebar-dsidein-logo" 
             />
-            <div className="brand-text">
-              <span className="brand-name">DSIDEIN</span>
-              <span className="brand-badge">ANALYTICS</span>
-            </div>
-          </div>
-          
-          <button 
-            className="btn-icon sidebar-close-btn" 
-            onClick={() => setMobileMenuOpen(false)}
-            aria-label="Close Sidebar"
-          >
-            <X size={18} />
-          </button>
+          </a>
+
+          {isOpen && (
+            <button 
+              className="sidebar-mobile-close hide-desktop" 
+              onClick={onClose}
+              aria-label="Close navigation"
+            >
+              <X size={18} />
+            </button>
+          )}
         </div>
 
-        {/* Navigation Links */}
-        <nav className="sidebar-nav" aria-label="Main Navigation">
-          <div className="nav-section-title">INTELLIGENCE</div>
-          
+        {/* Navigation Icons */}
+        <nav className="sidebar-nav">
           <button 
-            className={`nav-item ${activeTab === 'DASHBOARD' ? 'active' : ''}`}
+            className={`sidebar-nav-btn ${activeTab === 'DASHBOARD' ? 'active' : ''}`}
             onClick={() => handleNavClick('DASHBOARD')}
+            title={t('dashboard', language)}
           >
-            <LayoutDashboard size={18} />
-            <span>{t?.nav_dashboard || 'Dashboard'}</span>
+            <div className="active-rail-indicator" />
+            <LayoutDashboard size={20} />
+            <span className="sidebar-label hide-desktop">{t('dashboard', language)}</span>
           </button>
 
           <button 
-            className={`nav-item ${activeTab === 'PARTY_HUB' ? 'active' : ''}`}
+            className={`sidebar-nav-btn ${activeTab === 'PARTY_HUB' ? 'active' : ''}`}
             onClick={() => handleNavClick('PARTY_HUB')}
+            title={t('party_hub', language)}
           >
-            <Layers size={18} />
-            <span>{t?.nav_party_hub || 'Party Hub'}</span>
+            <Users size={20} />
+            <span className="sidebar-label hide-desktop">{t('party_hub', language)}</span>
           </button>
 
           <button 
-            className={`nav-item ${activeTab === 'BOOTHS' ? 'active' : ''}`}
+            className={`sidebar-nav-btn ${activeTab === 'BOOTHS' ? 'active' : ''}`}
             onClick={() => handleNavClick('BOOTHS')}
+            title={`${currentConst.total_booths} ${t('all_booths', language)}`}
           >
-            <MapPin size={18} />
-            <span>{t?.nav_booths || '218 Booths'}</span>
+            <MapPin size={20} />
+            <span className="sidebar-label hide-desktop">
+              {currentConst.total_booths} {t('all_booths', language)}
+            </span>
           </button>
 
-          <button 
-            className={`nav-item ${activeTab === 'AUDIT' ? 'active' : ''}`}
-            onClick={() => {
-              if (onOpenAudit) onOpenAudit();
-              else handleNavClick('AUDIT');
-            }}
-          >
-            <ShieldCheck size={18} />
-            <span>{t?.nav_audit || 'Booth Audit'}</span>
-            <span className="nav-badge-pill">100% Match</span>
-          </button>
-
-          <div className="nav-section-title" style={{ marginTop: '20px' }}>DOWNLOADS & EXPORTS</div>
-
+          {/* Master Excel Spreadsheet Download */}
           <a 
-            href="./Samrala_Master_Party_Booth_Analysis_2022_2024.xlsx" 
-            download 
-            className="nav-item"
-            title="Download Full Excel Workbook (.xlsx)"
+            href={currentConst.excelFile} 
+            download={currentConst.excelName}
+            className="sidebar-nav-btn"
+            title={`${t('master_excel', language)} (.xlsx)`}
+            onClick={() => { if (onClose) onClose(); }}
           >
-            <FileSpreadsheet size={18} />
-            <span>{t?.nav_master_excel || 'Master Excel'}</span>
+            <FileSpreadsheet size={20} />
+            <span className="sidebar-label hide-desktop">{t('master_excel', language)}</span>
+          </a>
+
+          {/* Comparison CSV Download */}
+          <a 
+            href={currentConst.csvFile} 
+            download={currentConst.csvName}
+            className="sidebar-nav-btn"
+            title={`${t('comparison_csv', language)} (.csv)`}
+            onClick={() => { if (onClose) onClose(); }}
+          >
+            <Download size={20} />
+            <span className="sidebar-label hide-desktop">{t('comparison_csv', language)}</span>
           </a>
 
           <a 
-            href="./Samrala_All_Booths_Comparison.csv" 
-            download 
-            className="nav-item"
-            title="Download All 218 Booths Comparison CSV"
+            href="https://dsidein.com" 
+            target="_blank" 
+            rel="noreferrer"
+            className="sidebar-nav-btn sidebar-external-btn"
+            title="Dsidein Official Portal"
           >
-            <FileText size={18} />
-            <span>All 218 Booths CSV</span>
+            <ExternalLink size={18} />
+            <span className="sidebar-label hide-desktop">dsidein.com</span>
           </a>
         </nav>
 
-        {/* Sidebar Footer Info */}
+        {/* Sidebar Footer */}
         <div className="sidebar-footer">
-          <div className="footer-card">
-            <div className="footer-card-header">
-              <span className="pulse-indicator"></span>
-              <span className="footer-card-title">58-SAMRALA AC</span>
-            </div>
-            <p className="footer-card-desc">
-              218 Booths Audited. 100% Form-20 Match with Zero Error.
-            </p>
-          </div>
+          <div className="sidebar-status-dot" title="Live Database Synchronized" />
+          <span className="sidebar-footer-text">
+            {language === 'pa' ? currentConst.name_pa : currentConst.name_en}
+          </span>
         </div>
       </aside>
     </>

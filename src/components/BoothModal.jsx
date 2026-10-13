@@ -1,282 +1,311 @@
 import React from 'react';
-import { 
-  X, 
-  MapPin, 
-  Vote, 
-  TrendingUp, 
-  ShieldCheck, 
-  ArrowUpRight, 
-  ArrowDownRight,
-  Calendar,
-  Compass,
-  CheckCircle2,
-  Printer
-} from 'lucide-react';
-import { formatStatus, formatCategory } from '../translations';
+import { X, Printer, Target, Download, FileText } from 'lucide-react';
+import { CONSTITUENCIES } from '../data/constituencies';
+import { t } from '../utils/translations';
 
-export default function BoothModal({ booth, onClose, language = 'en', t }) {
+export default function BoothModal({ booth, onClose, constituencyId, language }) {
   if (!booth) return null;
 
-  const isPa = language === 'pa';
-  const villageName = isPa ? (booth.village_pa || booth.village_en) : (booth.village_en || booth.village_pa);
-  const altName = isPa ? booth.village_en : booth.village_pa;
+  const currentConst = CONSTITUENCIES[constituencyId] || CONSTITUENCIES.SAMRALA;
+  const cand = currentConst.candidates;
 
-  const d24 = booth.data_2024 || {};
-  const d22 = booth.data_2022 || {};
-  const plan = booth.plan || {};
+  const d22 = booth.data_2022;
+  const d24 = booth.data_2024;
+  const comp = booth.comparison || {
+    status_label: booth.status_label,
+    is_flip: booth.is_flip,
+    turnout_diff: booth.turnout_diff,
+    turnout_pct: booth.turnout_pct,
+    inc_swing: booth.swings?.inc_swing,
+    aap_swing: booth.swings?.aap_swing,
+    sad_swing: booth.swings?.sad_swing,
+    bjp_swing: booth.swings?.bjp_swing
+  };
 
-  const handlePrint = () => {
+  // Safe percentage helper
+  const getWidth = (votes, total) => {
+    if (!total || total === 0) return '0%';
+    return `${Math.min(100, Math.round((votes / total) * 100))}%`;
+  };
+
+  const handlePrintBooth = (e) => {
+    e.stopPropagation();
+    document.body.classList.add('printing-single-booth');
     window.print();
+    setTimeout(() => {
+      document.body.classList.remove('printing-single-booth');
+    }, 1000);
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-container booth-modal-content" onClick={(e) => e.stopPropagation()}>
-        {/* Modal Header */}
-        <div className="modal-header">
-          <div className="modal-title-wrap">
-            <div className="modal-badge-row">
-              <span className="modal-booth-id">BOOTH #{booth.booth_no}</span>
-              <span className="audit-pill-badge">
-                <ShieldCheck size={13} className="inline-icon" />
-                1-to-1 Unchanged in 2022 & 2024
-              </span>
-              <span className={`status-pill ${booth.is_flipped ? 'status-flip' : 'status-retained'}`}>
-                {formatStatus(booth.status_label, language)}
-              </span>
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        {/* Dsidein Official PDF Watermark */}
+        <div className="dsidein-print-watermark" aria-hidden="true">
+          <img src="./dsidein_logo_transparent.png" alt="Dsidein" className="watermark-logo-img" />
+          <div className="watermark-brand-name">DSIDEIN</div>
+          <div className="watermark-sub-name">{currentConst.name_en} BOOTH INTELLIGENCE</div>
+          <div className="watermark-url">https://dsidein.com/samrala-2022-2024</div>
+        </div>
+
+        {/* Printable Official Banner */}
+        <div className="print-dossier-banner">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div className="print-dossier-title">
+                {currentConst.name_en} ASSEMBLY SEGMENT — BOOTH DOSSIER
+              </div>
+              <div className="print-dossier-sub">
+                Election Commission Data: 2022 Assembly vs 2024 Parliamentary Analysis ({currentConst.district_en})
+              </div>
             </div>
-            <h2 className="modal-main-title">{villageName}</h2>
-            <div className="modal-sub-locality">
-              <MapPin size={13} className="inline-icon" />
-              <span>{altName} • 58-Samrala AC (Fatehgarh Sahib PC)</span>
+            <div style={{ textAlign: 'right', fontSize: '8.5pt', color: '#334155' }}>
+              <span style={{ fontWeight: 800, color: '#002b49' }}>DSIDEIN COMMAND CENTER</span><br />
+              <span>https://dsidein.com/samrala-2022-2024</span>
             </div>
           </div>
+        </div>
 
-          <div className="modal-header-actions">
+        {/* Modal Header */}
+        <div className="modal-header">
+          <div>
+            <div className="modal-badges-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              {booth.is_rearranged || (booth.booth_no_2022 && booth.booth_no_2024 && booth.booth_no_2022 !== booth.booth_no_2024) ? (
+                <span className="brand-badge rearranged">
+                  {language === 'pa' 
+                    ? `2022: ਬੂਥ #${booth.booth_no_2022} ➔ 2024: ਬੂਥ #${booth.booth_no_2024}` 
+                    : `2022: Booth #${booth.booth_no_2022} ➔ 2024: Booth #${booth.booth_no_2024}`}
+                </span>
+              ) : (
+                <span className="brand-badge">
+                  {language === 'pa' 
+                    ? `ਬੂਥ #${booth.booth_no} (2022 & 2024)` 
+                    : `Booth #${booth.booth_no} (2022 & 2024)`}
+                </span>
+              )}
+              <span className={`status-badge ${comp.is_flip ? 'flipped' : 'retained'}`}>
+                {comp.status_label}
+              </span>
+              <span className="station-match-badge">
+                {language === 'pa' ? 'ਸਟੇਸ਼ਨ ਨਾਮ: 100% ਮੇਲ' : 'Station: 100% Match'}
+              </span>
+            </div>
+            
+            {language === 'pa' ? (
+              <>
+                <h2 className="modal-village-title punjabi-font" style={{ fontSize: '1.25rem', marginTop: '4px' }}>
+                  {booth.village_punjabi || booth.exact_name_punjabi}
+                </h2>
+                <p className="modal-village-sub" style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                  {booth.village_english}
+                </p>
+              </>
+            ) : (
+              <>
+                <h2 className="modal-village-title">{booth.village_english}</h2>
+                <p className="modal-village-sub punjabi-text">
+                  {booth.village_punjabi || booth.exact_name_punjabi}
+                </p>
+              </>
+            )}
+          </div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button 
-              className="btn-modal-print no-print" 
-              onClick={handlePrint} 
-              title="Print / Export Booth Dossier"
+              className="btn-print-modal no-print" 
+              onClick={handlePrintBooth}
+              title={language === 'pa' ? 'ਇਸ ਬੂਥ ਦਸਤਾਵੇਜ਼ ਨੂੰ ਪੀ.ਡੀ.ਐਫ ਵਜੋਂ ਪ੍ਰਿੰਟ / ਸੇਵ ਕਰੋ' : 'Export / Print this Booth Dossier as PDF'}
             >
-              <Printer size={16} />
-              <span>Print</span>
+              <Printer size={15} />
+              <span>{t('print_pdf', language)}</span>
             </button>
             <button 
-              className="btn-modal-close" 
-              onClick={onClose} 
-              aria-label="Close Modal"
+              className="modal-close-btn no-print" 
+              onClick={onClose}
+              aria-label={t('close', language)}
             >
               <X size={18} />
             </button>
           </div>
         </div>
 
-        {/* Modal Scrollable Body */}
-        <div className="modal-body">
-          {/* Section 1: KPI Comparison Row */}
-          <div className="modal-kpi-grid">
-            <div className="modal-kpi-card">
-              <span className="m-kpi-lbl">{isPa ? '2024 ਕੁੱਲ ਪੋਲਿੰਗ' : '2024 Turnout'}</span>
-              <div className="m-kpi-val">{booth.turnout_24?.toLocaleString()}</div>
-              <span className={`m-kpi-sub ${booth.turnout_diff >= 0 ? 'text-up' : 'text-down'}`}>
-                {booth.turnout_diff >= 0 ? '+' : ''}{booth.turnout_diff} ({booth.turnout_pct}%) vs 2022
+        {/* Modal Body: 2 Years Comparison Grid */}
+        <div className="modal-grid">
+          {/* 2022 Assembly Column */}
+          <div className="year-card">
+            <div className="year-title">{t('assembly_election', language)}</div>
+            <div className="modal-station-sub">
+              {language === 'pa' ? 'ਪੋਲਿੰਗ ਸਟੇਸ਼ਨ: ' : 'Station: '}
+              <strong>{booth.booth_name_2022 || booth.village_english}</strong>
+              <span style={{ marginLeft: '6px', color: 'var(--text-muted)' }}>(#{booth.booth_no_2022 || booth.booth_no})</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <span className={`badge-winner ${d22.winner_party}`}>
+                {d22.winner_party} {t('won_by', language)}
+              </span>
+              <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                +{d22.margin} {t('lead', language)}
               </span>
             </div>
 
-            <div className="modal-kpi-card">
-              <span className="m-kpi-lbl">{isPa ? '2024 ਜੇਤੂ ਅਤੇ ਲੀਡ' : '2024 Winner & Margin'}</span>
-              <div className="m-kpi-val highlight">
-                <span className={`party-pill ${booth.winner_24?.toLowerCase()}`}>{booth.winner_24}</span>
-                <span className="m-lead-tag">+{booth.margin_24?.toLocaleString()}</span>
+            {/* INC Bar */}
+            <div className="vote-bar-wrap">
+              <div className="vote-bar-label">
+                <span>{language === 'pa' ? cand['2022'].INC.short_pa : cand['2022'].INC.short_en}</span>
+                <span><strong>{d22.inc}</strong> ({d22.inc_pct}%)</span>
               </div>
-              <span className="m-kpi-sub">
-                {booth.winner_24 === 'INC' ? 'Dr. Amar Singh' : 
-                 booth.winner_24 === 'AAP' ? 'Gurpreet Singh GP' : 
-                 booth.winner_24 === 'SAD' ? 'Bikramjit Singh Khalsa' : 'Gejja Ram'}
-              </span>
-            </div>
-
-            <div className="modal-kpi-card">
-              <span className="m-kpi-lbl">{isPa ? '2022 ਜੇਤੂ ਅਤੇ ਲੀਡ' : '2022 Winner & Margin'}</span>
-              <div className="m-kpi-val">
-                <span className={`party-pill subtle ${booth.winner_22?.toLowerCase()}`}>{booth.winner_22}</span>
-                <span className="m-lead-tag">+{booth.margin_22?.toLocaleString()}</span>
-              </div>
-              <span className="m-kpi-sub">
-                {booth.winner_22 === 'AAP' ? 'Jagtar Singh Diyalpura' : 
-                 booth.winner_22 === 'SAD' ? 'Paramjit Singh Dhillon' : 
-                 booth.winner_22 === 'INC' ? 'Rupinder Singh Raja Gill' : 'Balbir Singh Rajewal'}
-              </span>
-            </div>
-
-            <div className="modal-kpi-card">
-              <span className="m-kpi-lbl">{isPa ? 'ਤਬਦੀਲੀ ਸਥਿਤੀ' : 'Shift Trajectory'}</span>
-              <div className="m-kpi-val trajectory-text">
-                {booth.is_flipped ? `${booth.winner_22} → ${booth.winner_24}` : `${booth.winner_24} Retained`}
-              </div>
-              <span className="m-kpi-sub">
-                {booth.is_flipped ? (isPa ? 'ਸੀਟ ਪਾਰਟੀ ਤਬਦੀਲ' : 'Flipped to new party') : (isPa ? 'ਗੜ੍ਹ ਬਰਕਰਾਰ' : 'Defended successfully')}
-              </span>
-            </div>
-          </div>
-
-          {/* Section 2: Detailed Party Breakdown Comparison */}
-          <div className="modal-section-card">
-            <h3 className="section-card-title">
-              <Vote size={16} />
-              <span>{t?.modal_section_comparison || '2022 vs 2024 Vote Share Comparison'}</span>
-            </h3>
-
-            <div className="party-comparison-table-wrap">
-              <table className="party-comparison-table">
-                <thead>
-                  <tr>
-                    <th>Party</th>
-                    <th>2022 Votes</th>
-                    <th>2022 Share</th>
-                    <th>2024 Votes</th>
-                    <th>2024 Share</th>
-                    <th>Net Swing</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {/* INC Row */}
-                  <tr className={booth.winner_24 === 'INC' ? 'winner-row' : ''}>
-                    <td>
-                      <span className="party-pill inc">INC</span>
-                      <span className="party-full-name">Indian National Congress</span>
-                    </td>
-                    <td>{booth.inc_22?.toLocaleString()}</td>
-                    <td>{booth.inc_share_22}%</td>
-                    <td><strong>{booth.inc_24?.toLocaleString()}</strong></td>
-                    <td><strong>{booth.inc_share_24}%</strong></td>
-                    <td className={booth.inc_swing >= 0 ? 'swing-positive' : 'swing-negative'}>
-                      {booth.inc_swing >= 0 ? '+' : ''}{booth.inc_swing}%
-                    </td>
-                  </tr>
-
-                  {/* AAP Row */}
-                  <tr className={booth.winner_24 === 'AAP' ? 'winner-row' : ''}>
-                    <td>
-                      <span className="party-pill aap">AAP</span>
-                      <span className="party-full-name">Aam Aadmi Party</span>
-                    </td>
-                    <td>{booth.aap_22?.toLocaleString()}</td>
-                    <td>{booth.aap_share_22}%</td>
-                    <td><strong>{booth.aap_24?.toLocaleString()}</strong></td>
-                    <td><strong>{booth.aap_share_24}%</strong></td>
-                    <td className={booth.aap_swing >= 0 ? 'swing-positive' : 'swing-negative'}>
-                      {booth.aap_swing >= 0 ? '+' : ''}{booth.aap_swing}%
-                    </td>
-                  </tr>
-
-                  {/* SAD Row */}
-                  <tr className={booth.winner_24 === 'SAD' ? 'winner-row' : ''}>
-                    <td>
-                      <span className="party-pill sad">SAD</span>
-                      <span className="party-full-name">Shiromani Akali Dal</span>
-                    </td>
-                    <td>{booth.sad_22?.toLocaleString()}</td>
-                    <td>{booth.sad_share_22}%</td>
-                    <td><strong>{booth.sad_24?.toLocaleString()}</strong></td>
-                    <td><strong>{booth.sad_share_24}%</strong></td>
-                    <td className={booth.sad_swing >= 0 ? 'swing-positive' : 'swing-negative'}>
-                      {booth.sad_swing >= 0 ? '+' : ''}{booth.sad_swing}%
-                    </td>
-                  </tr>
-
-                  {/* BJP Row */}
-                  <tr className={booth.winner_24 === 'BJP' ? 'winner-row' : ''}>
-                    <td>
-                      <span className="party-pill bjp">BJP</span>
-                      <span className="party-full-name">Bharatiya Janata Party</span>
-                    </td>
-                    <td>{booth.bjp_22?.toLocaleString()}</td>
-                    <td>{booth.bjp_share_22}%</td>
-                    <td><strong>{booth.bjp_24?.toLocaleString()}</strong></td>
-                    <td><strong>{booth.bjp_share_24}%</strong></td>
-                    <td className={booth.bjp_swing >= 0 ? 'swing-positive' : 'swing-negative'}>
-                      {booth.bjp_swing >= 0 ? '+' : ''}{booth.bjp_swing}%
-                    </td>
-                  </tr>
-
-                  {/* SAD(A) */}
-                  <tr>
-                    <td>
-                      <span className="party-pill other">SAD(A)</span>
-                      <span className="party-full-name">SAD Amritsar</span>
-                    </td>
-                    <td>{d22.sada || 0}</td>
-                    <td>-</td>
-                    <td><strong>{booth.sada_24?.toLocaleString() || 0}</strong></td>
-                    <td><strong>{booth.sada_share_24 || 0}%</strong></td>
-                    <td>-</td>
-                  </tr>
-
-                  {/* NOTA */}
-                  <tr>
-                    <td>
-                      <span className="party-pill other">NOTA</span>
-                      <span className="party-full-name">None of the Above</span>
-                    </td>
-                    <td>{d22.nota || 0}</td>
-                    <td>-</td>
-                    <td><strong>{d24.nota || 0}</strong></td>
-                    <td>-</td>
-                    <td>-</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Section 3: 90-Day Tactical Field Operations Plan */}
-          <div className="modal-section-card masterplan-card">
-            <div className="plan-card-header">
-              <Compass size={18} className="plan-icon" />
-              <div>
-                <h3 className="section-card-title" style={{ margin: 0 }}>
-                  {t?.modal_section_plan || '90-Day Tactical Field Operations Plan'}
-                </h3>
-                <span className="plan-zone-badge">
-                  {isPa ? plan.zone_pa : plan.zone_en}
-                </span>
+              <div className="vote-bar-track">
+                <div className="vote-bar-fill" style={{ width: getWidth(d22.inc, d22.total), background: '#0F766E' }} />
               </div>
             </div>
 
-            <div className="plan-strategic-directive">
-              <h4 className="directive-title">{isPa ? 'ਰਣਨੀਤਕ ਹਦਾਇਤ' : 'Strategic Directive'}</h4>
-              <p className="directive-text">
-                {isPa ? plan.action_pa : plan.action_en}
-              </p>
+            {/* AAP Bar */}
+            <div className="vote-bar-wrap">
+              <div className="vote-bar-label">
+                <span>{language === 'pa' ? cand['2022'].AAP.short_pa : cand['2022'].AAP.short_en}</span>
+                <span><strong>{d22.aap}</strong> ({d22.aap_pct}%)</span>
+              </div>
+              <div className="vote-bar-track">
+                <div className="vote-bar-fill" style={{ width: getWidth(d22.aap, d22.total), background: '#B28900' }} />
+              </div>
             </div>
 
-            <div className="plan-steps-grid">
-              {(isPa ? plan.steps_pa : plan.steps_en)?.map((step, idx) => (
-                <div key={idx} className="plan-step-item">
-                  <div className="step-phase-badge">
-                    <Calendar size={12} />
-                    <span>{idx === 0 ? 'Days 1-30' : idx === 1 ? 'Days 31-60' : 'Days 61-90'}</span>
-                  </div>
-                  <p className="step-content">{step}</p>
+            {/* SAD Bar */}
+            <div className="vote-bar-wrap">
+              <div className="vote-bar-label">
+                <span>{language === 'pa' ? cand['2022'].SAD.short_pa : cand['2022'].SAD.short_en}</span>
+                <span><strong>{d22.sad}</strong> ({d22.sad_pct}%)</span>
+              </div>
+              <div className="vote-bar-track">
+                <div className="vote-bar-fill" style={{ width: getWidth(d22.sad, d22.total), background: '#EA580C' }} />
+              </div>
+            </div>
+
+            {/* BJP Bar */}
+            {d22.bjp !== undefined && (
+              <div className="vote-bar-wrap">
+                <div className="vote-bar-label">
+                  <span>{language === 'pa' ? cand['2022'].BJP.short_pa : cand['2022'].BJP.short_en}</span>
+                  <span><strong>{d22.bjp}</strong> ({d22.bjp_pct}%)</span>
                 </div>
-              ))}
+                <div className="vote-bar-track">
+                  <div className="vote-bar-fill" style={{ width: getWidth(d22.bjp, d22.total), background: '#D97706' }} />
+                </div>
+              </div>
+            )}
+
+            {/* Total 2022 */}
+            <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '8px', marginTop: '12px', fontSize: '0.8125rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
+              <span>{t('total_polled', language)}:</span>
+              <strong style={{ color: 'var(--text-primary)' }}>{d22.total}</strong>
+            </div>
+          </div>
+
+          {/* 2024 Lok Sabha Column */}
+          <div className="year-card">
+            <div className="year-title">{t('lok_sabha_election', language)}</div>
+            <div className="modal-station-sub">
+              {language === 'pa' ? 'ਪੋਲਿੰਗ ਸਟੇਸ਼ਨ: ' : 'Station: '}
+              <strong>{booth.booth_name_2024 || booth.village_english}</strong>
+              <span style={{ marginLeft: '6px', color: 'var(--text-muted)' }}>(#{booth.booth_no_2024 || booth.booth_no})</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <span className={`badge-winner ${d24.winner_party}`}>
+                {d24.winner_party} {t('won_by', language)}
+              </span>
+              <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                +{d24.margin} {t('lead', language)}
+              </span>
+            </div>
+
+            {/* INC Bar */}
+            <div className="vote-bar-wrap">
+              <div className="vote-bar-label">
+                <span>{language === 'pa' ? cand['2024'].INC.short_pa : cand['2024'].INC.short_en}</span>
+                <span><strong>{d24.inc}</strong> ({d24.inc_pct}%)</span>
+              </div>
+              <div className="vote-bar-track">
+                <div className="vote-bar-fill" style={{ width: getWidth(d24.inc, d24.total), background: '#0F766E' }} />
+              </div>
+            </div>
+
+            {/* AAP Bar */}
+            <div className="vote-bar-wrap">
+              <div className="vote-bar-label">
+                <span>{language === 'pa' ? cand['2024'].AAP.short_pa : cand['2024'].AAP.short_en}</span>
+                <span><strong>{d24.aap}</strong> ({d24.aap_pct}%)</span>
+              </div>
+              <div className="vote-bar-track">
+                <div className="vote-bar-fill" style={{ width: getWidth(d24.aap, d24.total), background: '#B28900' }} />
+              </div>
+            </div>
+
+            {/* SAD Bar */}
+            <div className="vote-bar-wrap">
+              <div className="vote-bar-label">
+                <span>{language === 'pa' ? cand['2024'].SAD.short_pa : cand['2024'].SAD.short_en}</span>
+                <span><strong>{d24.sad}</strong> ({d24.sad_pct}%)</span>
+              </div>
+              <div className="vote-bar-track">
+                <div className="vote-bar-fill" style={{ width: getWidth(d24.sad, d24.total), background: '#EA580C' }} />
+              </div>
+            </div>
+
+            {/* BJP Bar */}
+            <div className="vote-bar-wrap">
+              <div className="vote-bar-label">
+                <span>{language === 'pa' ? cand['2024'].BJP.short_pa : cand['2024'].BJP.short_en}</span>
+                <span><strong>{d24.bjp || 0}</strong> ({d24.bjp_pct || 0}%)</span>
+              </div>
+              <div className="vote-bar-track">
+                <div className="vote-bar-fill" style={{ width: getWidth(d24.bjp || 0, d24.total), background: '#D97706' }} />
+              </div>
+            </div>
+
+            {/* Others & NOTA */}
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+              SAD(A): {d24.sada || 0} | BSP: {d24.bsp || 0} | Others: {d24.other || d24.baaki || 0} | NOTA: {d24.nota || 0}
+            </div>
+
+            {/* Total 2024 */}
+            <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '8px', marginTop: '8px', fontSize: '0.8125rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
+              <span>{t('total_polled', language)}:</span>
+              <strong style={{ color: 'var(--text-primary)' }}>{d24.total}</strong>
             </div>
           </div>
         </div>
 
-        {/* Modal Footer */}
-        <div className="modal-footer no-print">
-          <div className="footer-meta-info">
-            <span>Constituency: 58-Samrala</span>
-            <span>•</span>
-            <span>Fatehgarh Sahib Parliamentary Segment</span>
-            <span>•</span>
-            <span>Data Verified via ECI Form-20</span>
+        {/* Comparative Vote Swings Row */}
+        <div className="modal-shift-box" style={{ marginTop: '16px', padding: '16px', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)' }}>
+          <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '10px' }}>
+            {t('comparative_swings', language)}
           </div>
-          <button className="btn-modal-close-action" onClick={onClose}>
-            {t?.modal_close || 'Close Window'}
-          </button>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
+            <div className="shift-metric-tile">
+              <span className="shift-label">INC Swing</span>
+              <span className={`shift-val ${comp.inc_swing >= 0 ? 'gain' : 'loss'}`}>
+                {comp.inc_swing >= 0 ? `+${comp.inc_swing}%` : `${comp.inc_swing}%`}
+              </span>
+            </div>
+            <div className="shift-metric-tile">
+              <span className="shift-label">AAP Swing</span>
+              <span className={`shift-val ${comp.aap_swing >= 0 ? 'gain' : 'loss'}`}>
+                {comp.aap_swing >= 0 ? `+${comp.aap_swing}%` : `${comp.aap_swing}%`}
+              </span>
+            </div>
+            <div className="shift-metric-tile">
+              <span className="shift-label">SAD Swing</span>
+              <span className={`shift-val ${comp.sad_swing >= 0 ? 'gain' : 'loss'}`}>
+                {comp.sad_swing >= 0 ? `+${comp.sad_swing}%` : `${comp.sad_swing}%`}
+              </span>
+            </div>
+            <div className="shift-metric-tile">
+              <span className="shift-label">BJP Swing</span>
+              <span className={`shift-val ${comp.bjp_swing >= 0 ? 'gain' : 'loss'}`}>
+                {comp.bjp_swing !== undefined ? (comp.bjp_swing >= 0 ? `+${comp.bjp_swing}%` : `${comp.bjp_swing}%`) : 'N/A'}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

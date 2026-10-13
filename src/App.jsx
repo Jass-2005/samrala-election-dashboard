@@ -1,54 +1,49 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  ShieldCheck, 
-  FileSpreadsheet, 
-  FileText, 
-  Printer, 
-  ExternalLink,
-  ChevronRight,
-  TrendingUp,
-  Award,
-  Vote,
-  Sparkles,
-  Info
-} from 'lucide-react';
-
-import samralaData from './data/samrala_comparison_data.json';
-import { translations } from './translations';
+import React, { useState, useMemo, useEffect } from 'react';
 import './App.css';
-
-import Header from './components/Header';
+import { CONSTITUENCIES } from './data/constituencies';
+import { t } from './utils/translations';
 import Sidebar from './components/Sidebar';
+import Header from './components/Header';
 import KPIBanner from './components/KPIBanner';
-import BoothGrid from './components/BoothGrid';
 import PartyHub from './components/PartyHub';
-import RenumberingAuditModal from './components/RenumberingAuditModal';
+import BoothGrid from './components/BoothGrid';
 import BoothModal from './components/BoothModal';
 import CustomDropdown from './components/CustomDropdown';
+import RenumberingAuditModal from './components/RenumberingAuditModal';
+import { 
+  Search, 
+  RotateCcw, 
+  Printer, 
+  FileSpreadsheet, 
+  Compass, 
+  Activity, 
+  Award,
+  Download,
+  ShieldCheck
+} from 'lucide-react';
 
 export default function App() {
-  // 1. Core State
   const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('samrala_theme') || 'dark';
+    return localStorage.getItem('samrala_theme') || 'light';
   });
-
+  const [constituencyId, setConstituencyId] = useState('SAMRALA');
   const [language, setLanguage] = useState(() => {
     return localStorage.getItem('samrala_lang') || 'en';
   });
-
-  const [activeTab, setActiveTab] = useState('DASHBOARD'); // 'DASHBOARD', 'PARTY_HUB', 'BOOTHS', 'AUDIT'
-  const [selectedParty, setSelectedParty] = useState('ALL'); // 'ALL', 'INC', 'AAP', 'SAD', 'BJP'
-  const [partyFilter, setPartyFilter] = useState('ALL'); // 'ALL', 'INC_WINS', 'AAP_WINS', 'SAD_WINS', 'BJP_WINS', 'FLIPPED_ONLY', 'RETAINED_ONLY'
-  const [categoryFilter, setCategoryFilter] = useState('ALL'); // 'ALL', 'WON_BOTH', 'GAINED', 'LOST_24', 'WEAK'
+  const [activeTab, setActiveTab] = useState('DASHBOARD');
+  const [selectedParty, setSelectedParty] = useState('ALL'); // 'ALL', 'AAP', 'INC', 'SAD', 'BJP'
+  const [partyFilter, setPartyFilter] = useState('ALL'); 
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('BOOTH_ASC');
-
-  // Modals
   const [selectedBooth, setSelectedBooth] = useState(null);
   const [auditModalOpen, setAuditModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Sync theme with HTML root attribute
+  // Active Constituency Dataset
+  const currentConst = CONSTITUENCIES[constituencyId] || CONSTITUENCIES.SAMRALA;
+  const { summary, booths } = currentConst.data;
+
+  // Apply theme
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('samrala_theme', theme);
@@ -59,479 +54,480 @@ export default function App() {
     localStorage.setItem('samrala_lang', language);
   }, [language]);
 
+  // Reset filters when constituency changes
+  useEffect(() => {
+    setSelectedParty('ALL');
+    setPartyFilter('ALL');
+    setSearchQuery('');
+    setSortBy('BOOTH_ASC');
+    setSelectedBooth(null);
+  }, [constituencyId]);
+
   const toggleTheme = () => {
     setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  const isPa = language === 'pa';
-  const t = translations[language] || translations.en;
-
-  const summary = samralaData.summary || {};
-  const allBooths = samralaData.booths || [];
-
-  // Compute party stats for Party Hub
-  const partyStats = useMemo(() => {
-    const parties = ['INC', 'AAP', 'SAD', 'BJP'];
-    const candidates = {
-      INC: { c24: 'Dr. Amar Singh (MP)', c22: 'Rupinder Singh Raja Gill' },
-      AAP: { c24: 'Gurpreet Singh GP', c22: 'Jagtar Singh Diyalpura (MLA)' },
-      SAD: { c24: 'Bikramjit Singh Khalsa', c22: 'Paramjit Singh Dhillon' },
-      BJP: { c24: 'Gejja Ram Valmiki', c22: 'Ranjit Singh Gahlewal' }
-    };
-
-    const stats = {};
-    parties.forEach(p => {
-      const pLower = p.toLowerCase();
-      const v24 = summary.party_votes_2024?.[p] || 0;
-      const v22 = summary.party_votes_2022?.[p] || 0;
-      const s24 = summary.party_shares_2024?.[p] || 0;
-      const s22 = summary.party_shares_2022?.[p] || 0;
-      const w24 = summary.booths_won_2024?.[p] || 0;
-      const w22 = summary.booths_won_2022?.[p] || 0;
-
-      let won_both = 0;
-      let gained = 0;
-      let lost_24 = 0;
-      let weak = 0;
-      let top_booth = { no: 1, name: '', votes: 0 };
-
-      allBooths.forEach(b => {
-        const cat = b.categories?.[p];
-        if (cat === 'WON_BOTH') won_both++;
-        else if (cat === 'GAINED') gained++;
-        else if (cat === 'LOST_24') lost_24++;
-        else if (cat === 'WEAK') weak++;
-
-        const votes = b[`${pLower}_24`] || b.data_2024?.[`${pLower}_votes`] || 0;
-        if (votes > top_booth.votes) {
-          top_booth = {
-            no: b.booth_no,
-            name: isPa ? (b.village_pa || b.village_en) : (b.village_en || b.village_pa),
-            votes: votes,
-            pct: b[`${pLower}_share_24`] || 0
-          };
-        }
-      });
-
-      stats[p] = {
-        votes_2024: v24,
-        votes_2022: v22,
-        share_2024: s24,
-        share_2022: s22,
-        swing: Number((s24 - s22).toFixed(2)),
-        booths_won_2024: w24,
-        booths_won_2022: w22,
-        won_both,
-        gained,
-        lost_24,
-        weak,
-        top_booth,
-        c24: candidates[p]?.c24,
-        c22: candidates[p]?.c22
-      };
-    });
-
-    return stats;
-  }, [allBooths, summary, isPa]);
-
-  // Handle Tab Switch
-  const handleSelectPartyTab = (party) => {
-    setSelectedParty(party);
-    setPartyFilter('ALL');
-    setCategoryFilter('ALL');
-    if (activeTab === 'PARTY_HUB') {
-      setActiveTab('DASHBOARD');
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setMobileMenuOpen(false);
+    if (tab === 'DASHBOARD') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (tab === 'PARTY_HUB') {
+      const el = document.querySelector('.dsidein-registry-card');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    } else if (tab === 'BOOTHS') {
+      const el = document.querySelector('.booth-container');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
-  const handleApplyQuickFilter = (category) => {
-    setCategoryFilter(category);
-    setActiveTab('DASHBOARD');
-  };
+  // Pre-calculated stats for all 4 parties (AAP, INC, SAD, BJP)
+  const partyStats = useMemo(() => {
+    const calcParty = (pCode) => {
+      const pKey = pCode.toLowerCase();
+      const sorted = [...booths].sort((a, b) => (b.data_2024[pKey] || 0) - (a.data_2024[pKey] || 0));
+      
+      let v22 = summary?.votes_2022?.[pKey];
+      let sh22 = summary?.votes_2022?.[`${pKey}_pct`];
+      let v24 = summary?.votes_2024?.[pKey];
+      let sh24 = summary?.votes_2024?.[`${pKey}_pct`];
 
-  // Filter & Sort Logic
-  const filteredBooths = useMemo(() => {
-    return allBooths.filter(b => {
-      // 1. Search Query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const bNoStr = String(b.booth_no);
-        const vEn = (b.village_en || '').toLowerCase();
-        const vPa = (b.village_pa || '').toLowerCase();
-        const w24 = (b.winner_24 || '').toLowerCase();
-        const w22 = (b.winner_22 || '').toLowerCase();
-
-        const match = 
-          bNoStr === q || 
-          bNoStr.includes(q) || 
-          vEn.includes(q) || 
-          vPa.includes(q) ||
-          w24.includes(q) ||
-          w22.includes(q);
-
-        if (!match) return false;
+      if (v22 === undefined) {
+        v22 = booths.reduce((acc, b) => acc + (b.data_2022[pKey] || 0), 0);
+        const tot22 = summary?.total_votes_2022 || booths.reduce((acc, b) => acc + (b.data_2022.total || 0), 0);
+        sh22 = tot22 > 0 ? Number(((v22 / tot22) * 100).toFixed(2)) : 0;
+      }
+      if (v24 === undefined) {
+        v24 = booths.reduce((acc, b) => acc + (b.data_2024[pKey] || 0), 0);
+        const tot24 = summary?.total_votes_2024 || booths.reduce((acc, b) => acc + (b.data_2024.total || 0), 0);
+        sh24 = tot24 > 0 ? Number(((v24 / tot24) * 100).toFixed(2)) : 0;
       }
 
-      // 2. Party Filter in ALL Mode
-      if (selectedParty === 'ALL') {
-        if (partyFilter === 'INC_WINS' && b.winner_24 !== 'INC') return false;
-        if (partyFilter === 'AAP_WINS' && b.winner_24 !== 'AAP') return false;
-        if (partyFilter === 'SAD_WINS' && b.winner_24 !== 'SAD') return false;
-        if (partyFilter === 'BJP_WINS' && b.winner_24 !== 'BJP') return false;
-        if (partyFilter === 'FLIPPED_ONLY' && !b.is_flipped) return false;
-        if (partyFilter === 'RETAINED_ONLY' && b.is_flipped) return false;
-      } else {
-        // 3. Single Party Category Filter
-        if (categoryFilter !== 'ALL') {
-          const cat = b.categories?.[selectedParty];
-          if (cat !== categoryFilter) return false;
+      const diff = v24 - v22;
+
+      let won_both = 0, gained = 0, lost_24 = 0, weak = 0, lost_both = 0;
+      booths.forEach(b => {
+        const w22 = b.data_2022.winner_party || b.data_2022.winner;
+        const w24 = b.data_2024.winner_party || b.data_2024.winner;
+        const pct24 = b.data_2024[`${pKey}_pct`] || (b.data_2024.total > 0 ? ((b.data_2024[pKey] || 0) / b.data_2024.total * 100) : 0);
+        if (w22 === pCode && w24 === pCode) won_both++;
+        else if (w22 !== pCode && w24 === pCode) gained++;
+        else if (w22 === pCode && w24 !== pCode) lost_24++;
+        if (pct24 < 20.0) weak++;
+        if (w22 !== pCode && w24 !== pCode) lost_both++;
+      });
+
+      const bw24Count = summary?.votes_2024?.booths_won?.[pCode] ?? summary?.booths_won_2024?.[pCode] ?? (won_both + gained);
+      const bw22Count = summary?.votes_2022?.booths_won?.[pCode] ?? summary?.booths_won_2022?.[pCode] ?? (won_both + lost_24);
+
+      return {
+        votes_2022: v22,
+        share_2022: sh22,
+        votes_2024: v24,
+        share_2024: sh24,
+        vote_diff: diff,
+        won_both_count: won_both,
+        gained_count: gained,
+        lost_24_count: lost_24,
+        weak_count: weak,
+        lost_both_count: lost_both,
+        booths_won_24: bw24Count,
+        booths_won_22: bw22Count,
+        top_booth: {
+          no: sorted[0]?.booth_no,
+          name: language === 'pa' ? (sorted[0]?.village_punjabi || sorted[0]?.exact_name_punjabi) : sorted[0]?.village_english,
+          votes: sorted[0]?.data_2024?.[pKey] || 0
         }
+      };
+    };
+
+    return {
+      AAP: calcParty('AAP'),
+      INC: calcParty('INC'),
+      SAD: calcParty('SAD'),
+      BJP: calcParty('BJP')
+    };
+  }, [booths, summary, language]);
+
+  // Filtering & Sorting
+  const filteredBooths = useMemo(() => {
+    let result = [...booths];
+
+    // 1. Search Query
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter(b => 
+        b.booth_no.toString() === q ||
+        (b.village_english && b.village_english.toLowerCase().includes(q)) ||
+        (b.village_punjabi && b.village_punjabi.includes(q)) ||
+        (b.exact_name_punjabi && b.exact_name_punjabi.includes(q))
+      );
+    }
+
+    // 2. Filter logic based on mode
+    if (selectedParty === 'ALL') {
+      if (partyFilter === 'INC_WINS') {
+        result = result.filter(b => (b.data_2024.winner_party || b.data_2024.winner) === 'INC');
+      } else if (partyFilter === 'AAP_WINS') {
+        result = result.filter(b => (b.data_2024.winner_party || b.data_2024.winner) === 'AAP');
+      } else if (partyFilter === 'SAD_WINS') {
+        result = result.filter(b => (b.data_2024.winner_party || b.data_2024.winner) === 'SAD');
+      } else if (partyFilter === 'BJP_WINS') {
+        result = result.filter(b => (b.data_2024.winner_party || b.data_2024.winner) === 'BJP');
+      } else if (partyFilter === 'FLIPPED') {
+        result = result.filter(b => b.is_flip || b.comparison?.is_flip);
       }
+    } else {
+      // Party-specific mode (AAP, INC, SAD, BJP)
+      const pKey = selectedParty.toLowerCase();
+      if (partyFilter !== 'ALL') {
+        result = result.filter(b => {
+          const w22 = b.data_2022.winner_party || b.data_2022.winner;
+          const w24 = b.data_2024.winner_party || b.data_2024.winner;
+          const pct24 = b.data_2024[`${pKey}_pct`] || (b.data_2024.total > 0 ? ((b.data_2024[pKey] || 0) / b.data_2024.total * 100) : 0);
 
-      return true;
-    }).sort((a, b) => {
-      // Sorting
-      if (sortBy === 'BOOTH_ASC') return a.booth_no - b.booth_no;
-      if (sortBy === 'BOOTH_DESC') return b.booth_no - a.booth_no;
-      if (sortBy === 'TURNOUT_DESC') return (b.turnout_24 || 0) - (a.turnout_24 || 0);
-      if (sortBy === 'TURNOUT_ASC') return (a.turnout_24 || 0) - (b.turnout_24 || 0);
-      if (sortBy === 'MARGIN_DESC') return (b.margin_24 || 0) - (a.margin_24 || 0);
-      if (sortBy === 'INC_DESC') return (b.inc_24 || 0) - (a.inc_24 || 0);
-      if (sortBy === 'AAP_DESC') return (b.aap_24 || 0) - (a.aap_24 || 0);
-      if (sortBy === 'SAD_DESC') return (b.sad_24 || 0) - (a.sad_24 || 0);
-      if (sortBy === 'BJP_DESC') return (b.bjp_24 || 0) - (a.bjp_24 || 0);
-      return a.booth_no - b.booth_no;
+          if (partyFilter === 'WON_BOTH') {
+            return w22 === selectedParty && w24 === selectedParty;
+          }
+          if (partyFilter === 'GAINED') {
+            return w22 !== selectedParty && w24 === selectedParty;
+          }
+          if (partyFilter === 'LOST_24') {
+            return w22 === selectedParty && w24 !== selectedParty;
+          }
+          if (partyFilter === 'WEAK') {
+            return pct24 < 20.0 && b.data_2024.total > 0;
+          }
+          if (partyFilter === 'LOST_BOTH') {
+            return w22 !== selectedParty && w24 !== selectedParty;
+          }
+          return true;
+        });
+      }
+    }
+
+    // 3. Sorting
+    result.sort((a, b) => {
+      const pKey = selectedParty === 'ALL' ? 'inc' : selectedParty.toLowerCase();
+      switch (sortBy) {
+        case 'BOOTH_DESC':
+          return b.booth_no - a.booth_no;
+        case 'VOTES_DESC':
+          return (b.data_2024[pKey] || 0) - (a.data_2024[pKey] || 0);
+        case 'VOTES_ASC':
+          return (a.data_2024[pKey] || 0) - (b.data_2024[pKey] || 0);
+        case 'TURNOUT_DESC':
+          return b.data_2024.total - a.data_2024.total;
+        case 'MARGIN_DESC':
+          return b.data_2024.margin - a.data_2024.margin;
+        case 'BOOTH_ASC':
+        default:
+          return a.booth_no - b.booth_no;
+      }
     });
-  }, [allBooths, searchQuery, selectedParty, partyFilter, categoryFilter, sortBy]);
 
-  const handleResetFilters = () => {
+    return result;
+  }, [booths, selectedParty, partyFilter, searchQuery, sortBy]);
+
+  // Sort options for CustomDropdown
+  const sortOptions = useMemo(() => {
+    const total = currentConst.total_booths;
+    const opts = [
+      { value: 'BOOTH_ASC', label: language === 'pa' ? `ਬੂਥ ਨੰ. (1 → ${total})` : `Booth No. (1 → ${total})` },
+      { value: 'BOOTH_DESC', label: language === 'pa' ? `ਬੂਥ ਨੰ. (${total} → 1)` : `Booth No. (${total} → 1)` },
+      { value: 'TURNOUT_DESC', label: language === 'pa' ? 'ਸਭ ਤੋਂ ਵੱਧ 2024 ਵੋਟਿੰਗ' : 'Highest 2024 Turnout' },
+      { value: 'MARGIN_DESC', label: language === 'pa' ? 'ਸਭ ਤੋਂ ਵੱਧ 2024 ਜਿੱਤ ਦਾ ਫ਼ਰਕ' : 'Highest 2024 Margin' },
+    ];
+    if (selectedParty !== 'ALL') {
+      opts.push(
+        { value: 'VOTES_DESC', label: language === 'pa' ? `ਸਭ ਤੋਂ ਵੱਧ ${selectedParty} ਵੋਟਾਂ` : `Highest ${selectedParty} Votes` },
+        { value: 'VOTES_ASC', label: language === 'pa' ? `ਸਭ ਤੋਂ ਘੱਟ ${selectedParty} ਵੋਟਾਂ` : `Lowest ${selectedParty} Votes` }
+      );
+    }
+    return opts;
+  }, [selectedParty, currentConst.total_booths, language]);
+
+  // Reset all filters
+  const handleResetToCompleteList = () => {
     setSelectedParty('ALL');
     setPartyFilter('ALL');
-    setCategoryFilter('ALL');
     setSearchQuery('');
     setSortBy('BOOTH_ASC');
   };
 
-  const handlePrint = () => {
+  // Export Single Booth to PDF
+  const handleExportBoothPdf = (booth) => {
+    setSelectedBooth(booth);
+    setTimeout(() => {
+      document.body.classList.add('printing-single-booth');
+      window.print();
+      setTimeout(() => {
+        document.body.classList.remove('printing-single-booth');
+      }, 1000);
+    }, 150);
+  };
+
+  // Export Filtered View / Master List to PDF
+  const handlePrintMasterReport = () => {
+    document.body.classList.remove('printing-single-booth');
     window.print();
   };
 
-  // Sort dropdown options
-  const sortOptions = [
-    { value: 'BOOTH_ASC', label: t?.sort_booth_asc || 'Booth No (1 → 218)' },
-    { value: 'BOOTH_DESC', label: t?.sort_booth_desc || 'Booth No (218 → 1)' },
-    { value: 'TURNOUT_DESC', label: t?.sort_turnout_desc || 'Turnout 2024 (High → Low)' },
-    { value: 'TURNOUT_ASC', label: t?.sort_turnout_asc || 'Turnout 2024 (Low → High)' },
-    { value: 'MARGIN_DESC', label: t?.sort_margin_desc || 'Lead Margin (Highest Win)' },
-    { value: 'INC_DESC', label: t?.sort_inc_desc || 'INC Votes (High → Low)' },
-    { value: 'AAP_DESC', label: t?.sort_aap_desc || 'AAP Votes (High → Low)' },
-    { value: 'SAD_DESC', label: t?.sort_sad_desc || 'SAD Votes (High → Low)' },
-    { value: 'BJP_DESC', label: t?.sort_bjp_desc || 'BJP Votes (High → Low)' },
-  ];
-
   return (
-    <div className="app-shell" data-theme={theme}>
-      {/* 1. Header */}
-      <Header 
-        theme={theme}
-        toggleTheme={toggleTheme}
-        onMenuClick={() => setMobileMenuOpen(prev => !prev)}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        filteredCount={filteredBooths.length}
+    <div className="dsidein-app-root">
+      {/* 1. Left Slim Navigation Rail */}
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={handleTabChange} 
+        isOpen={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+        constituencyId={constituencyId}
         language={language}
-        onLanguageChange={setLanguage}
-        t={t}
       />
 
-      <div className="app-main-layout">
-        {/* 2. Sidebar Navigation */}
-        <Sidebar 
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          mobileMenuOpen={mobileMenuOpen}
-          setMobileMenuOpen={setMobileMenuOpen}
-          onOpenAudit={() => setAuditModalOpen(true)}
-          t={t}
+      {/* 2. Main Content Frame */}
+      <div className="dsidein-content-frame">
+        {/* Top Navigation Bar with Constituency Switcher & Language Toggle */}
+        <Header 
+          theme={theme} 
+          toggleTheme={toggleTheme} 
+          onMenuClick={() => setMobileMenuOpen(prev => !prev)} 
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          constituencyId={constituencyId}
+          setConstituencyId={setConstituencyId}
+          language={language}
+          setLanguage={setLanguage}
         />
 
-        {/* 3. Main Dashboard Viewport */}
-        <main className="dashboard-content">
-          <div className="content-inner">
-            {/* Title Block & Actions */}
-            <div className="title-section-bar">
-              <div className="title-left">
-                <span className="segment-badge-tag">{t?.segment_tag || '58-SAMRALA ASSEMBLY SEGMENT'}</span>
-                <h1 className="title-main">{t?.main_title || 'Comparative Booth Intelligence'}</h1>
-                <p className="title-subtitle">{t?.main_subtitle || '2022 Vidhan Sabha vs 2024 Lok Sabha Polling Telemetry across all 218 Polling Stations (Fatehgarh Sahib PC)'}</p>
+        {/* Dsidein Official PDF Watermark */}
+        <div className="dsidein-print-watermark" aria-hidden="true">
+          <img src="./dsidein_logo_transparent.png" alt="Dsidein" className="watermark-logo-img" />
+          <div className="watermark-brand-name">DSIDEIN</div>
+          <div className="watermark-sub-name">{currentConst.name_en} BOOTH INTELLIGENCE</div>
+          <div className="watermark-url">https://dsidein.com/samrala-2022-2024</div>
+        </div>
+
+        {/* Print Master Report Header */}
+        <div className="print-report-header">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ fontSize: '15pt', fontWeight: 800, color: '#002b49' }}>
+                {currentConst.name_en.toUpperCase()} ASSEMBLY SEGMENT ({currentConst.district_en.toUpperCase()})
+              </div>
+              <div style={{ fontSize: '10pt', color: '#475569', marginTop: '2px' }}>
+                Comparative Booth Intelligence: 2022 Assembly vs 2024 Lok Sabha Polling
+              </div>
+              <div style={{ fontSize: '8.5pt', color: '#64748b', marginTop: '4px' }}>
+                Active Filter: {selectedParty === 'ALL' ? 'Complete Master List' : `${selectedParty} Segment`} | Total Booths: {filteredBooths.length} of {currentConst.total_booths}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right', fontSize: '8.5pt', color: '#334155' }}>
+              <span style={{ fontWeight: 800, color: '#002b49' }}>DSIDEIN COMMAND CENTER</span><br />
+              <span>https://dsidein.com/samrala-2022-2024</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Scrollable Main Dashboard Area */}
+        <main className="dsidein-main-body">
+          {/* Dashboard Title Bar */}
+          <section className="dashboard-title-bar">
+            <div className="title-text-group">
+              <div className="constituency-tag">
+                {language === 'pa' ? currentConst.name_pa : currentConst.name_en}
+              </div>
+              <h1 className="main-title">
+                {language === 'pa' ? 'ਬੂਥ-ਵਾਰ ਚੋਣ ਤੁਲਨਾ ਅਤੇ ਵਿਸ਼ਲੇਸ਼ਣ' : 'Comparative Booth Intelligence'}
+              </h1>
+              <p className="main-subtitle">
+                {language === 'pa'
+                  ? `2022 ਵਿਧਾਨ ਸਭਾ ਬਨਾਮ 2024 ਲੋਕ ਸਭਾ ਚੋਣ ਨਤੀਜੇ — ਸਮੂਹ ${currentConst.total_booths} ਪੋਲਿੰਗ ਸਟੇਸ਼ਨ (${currentConst.district_pa})`
+                  : `2022 Vidhan Sabha vs 2024 Lok Sabha Polling Telemetry across all ${currentConst.total_booths} Polling Stations (${currentConst.district_en})`
+                }
+              </p>
+            </div>
+
+            {/* Direct Excel & CSV Download Actions */}
+            <div className="title-action-buttons">
+              {/* Renumbering & Booth Alignment Audit Button */}
+              <button
+                onClick={() => setAuditModalOpen(true)}
+                className="pill-action-btn outline"
+                style={{ borderColor: 'var(--brand-teal, #00a896)', color: 'var(--brand-teal, #00a896)' }}
+                title="100% Booth Alignment & Renumbering Audit"
+              >
+                <span className="pill-btn-icon"><ShieldCheck size={14} /></span>
+                <span className="pill-btn-label">
+                  {language === 'pa' ? '100% ਬੂਥ ਤਸਦੀਕ ਆਡਿਟ' : '100% Booth Alignment Audit'}
+                </span>
+              </button>
+
+              <a 
+                href={currentConst.excelFile} 
+                download={currentConst.excelName}
+                className="pill-action-btn green"
+                title={language === 'pa' ? 'ਮਾਸਟਰ ਐਕਸਲ ਸ਼ੀਟ ਡਾਊਨਲੋਡ ਕਰੋ (.xlsx)' : 'Download Master Analysis Spreadsheet (Excel .xlsx with AAP/INC Colors)'}
+              >
+                <span className="pill-btn-icon"><FileSpreadsheet size={14} /></span>
+                <span className="pill-btn-label">
+                  {language === 'pa' ? 'ਮਾਸਟਰ ਐਕਸਲ ਸ਼ੀਟ (.xlsx)' : 'Master Excel (.xlsx)'}
+                </span>
+              </a>
+
+              <a 
+                href={currentConst.csvFile} 
+                download={currentConst.csvName}
+                className="pill-action-btn purple"
+                title={language === 'pa' ? 'ਸਾਰੇ ਬੂਥਾਂ ਦਾ ਡਾਟਾ ਡਾਊਨਲੋਡ ਕਰੋ (.csv)' : 'Download Complete Booth Data in CSV'}
+              >
+                <span className="pill-btn-icon"><Download size={14} /></span>
+                <span className="pill-btn-label">
+                  {language === 'pa' ? 'ਬੂਥ ਡਾਟਾ (CSV)' : 'All Booths CSV'}
+                </span>
+              </a>
+
+              <button 
+                onClick={handlePrintMasterReport}
+                className="pill-action-btn outline"
+                title="Export Current View as PDF with Dsidein Watermark"
+              >
+                <span className="pill-btn-icon"><Printer size={14} /></span>
+                <span className="pill-btn-label">{t('print_pdf', language)}</span>
+              </button>
+            </div>
+          </section>
+
+          {/* Dsidein 4 Minimal KPI Metric Cards */}
+          <KPIBanner 
+            summary={summary} 
+            constituencyId={constituencyId} 
+            language={language} 
+          />
+
+          {/* Master Booth Registry Card */}
+          <section className="dsidein-registry-card">
+            <div className="registry-card-header">
+              <div className="registry-title-group">
+                <div className="registry-title-row">
+                  <h2 className="registry-title">
+                    {language === 'pa' ? 'ਬੂਥ ਕਾਰਗੁਜ਼ਾਰੀ ਰਜਿਸਟਰੀ' : 'Booth Performance Registry'}
+                  </h2>
+                  <span className="registry-booth-count">
+                    {filteredBooths.length} {language === 'pa' ? 'ਬੂਥ' : 'Booths'}
+                  </span>
+                </div>
+                <p className="registry-subtitle">
+                  {language === 'pa' 
+                    ? `ਹਲਕਾ ${currentConst.name_pa} ਦੇ ਹਰੇਕ ਬੂਥ ਦੀ ਵੋਟ ਗਿਣਤੀ, ਵੋਟਿੰਗ ਫ਼ਰਕ, ਜੇਤੂ ਅਤੇ ਲੀਡ`
+                    : `Detailed booth-by-booth vote tally, turnout, winners, and margin shifts across ${currentConst.name_en}`
+                  }
+                </p>
               </div>
 
-              <div className="title-actions no-print">
-                <a 
-                  href="./Samrala_Master_Party_Booth_Analysis_2022_2024.xlsx"
-                  download
-                  className="btn-action-primary"
-                  title={t?.action_excel_title || 'Download Master Excel'}
+              <div className="registry-header-actions">
+                {/* Master Excel Download in Toolbar */}
+                <a
+                  href={currentConst.excelFile}
+                  download={currentConst.excelName}
+                  className="btn-toolbar-pdf"
+                  style={{ textDecoration: 'none', background: '#ecfdf5', color: '#065f46', borderColor: '#a7f3d0' }}
+                  title="Download Master Excel Spreadsheet"
                 >
-                  <FileSpreadsheet size={16} />
-                  <span>{t?.action_excel || 'Master Excel'}</span>
+                  <FileSpreadsheet size={14} />
+                  <span>{language === 'pa' ? 'ਐਕਸਲ ਸ਼ੀਟ (.xlsx)' : 'Download Excel'}</span>
                 </a>
 
                 <button 
-                  className="btn-action-outline"
-                  onClick={() => setAuditModalOpen(true)}
-                  title={t?.action_audit_title || 'View Booth Numbering Audit'}
+                  className="btn-registry-reset"
+                  onClick={handleResetToCompleteList}
+                  title="Reset all filters to complete view"
                 >
-                  <ShieldCheck size={16} />
-                  <span>{t?.action_audit || 'Booth Audit'}</span>
-                </button>
-
-                <button 
-                  className="btn-action-outline"
-                  onClick={handlePrint}
-                  title={t?.action_export_pdf_title || 'Print/Export PDF'}
-                >
-                  <Printer size={16} />
-                  <span>{t?.action_export_pdf || 'Export PDF'}</span>
+                  <RotateCcw size={14} />
+                  <span>{t('reset_filters', language)}</span>
                 </button>
               </div>
             </div>
 
-            {/* Strict Renumbering Audit Notification Banner */}
-            <div className="audit-notification-strip">
-              <div className="strip-left">
-                <ShieldCheck size={18} className="strip-shield-icon" />
-                <div className="strip-text-wrap">
-                  <strong className="strip-title">{t?.audit_banner_title || 'BOOTH NUMBERING AUDIT: 100% IDENTICAL IN BOTH ELECTIONS'}</strong>
-                  <p className="strip-desc">{t?.audit_banner_desc || 'Strict sequential and mathematical analysis proves Booths #1 to #218 remained 100% unchanged between 2022 Vidhan Sabha and 2024 Lok Sabha. Correlation: 0.9412. Zero auxiliary/split booths.'}</p>
-                </div>
-              </div>
-              <button 
-                className="btn-strip-action no-print"
-                onClick={() => setAuditModalOpen(true)}
-              >
-                <span>{t?.audit_banner_btn || 'View Full Audit Report'}</span>
-                <ChevronRight size={14} />
-              </button>
-            </div>
-
-            {/* KPI Summary Banner */}
-            <KPIBanner 
+            {/* Party Selector & Category Filter Pills (AAP, INC, SAD, BJP) */}
+            <PartyHub 
+              selectedParty={selectedParty}
+              setSelectedParty={setSelectedParty}
+              partyFilter={partyFilter}
+              setPartyFilter={setPartyFilter}
+              partyStats={partyStats}
               summary={summary}
-              t={t}
-              onOpenAudit={() => setAuditModalOpen(true)}
+              constituencyId={constituencyId}
+              language={language}
             />
 
-            {/* TAB CONTENT 1: PARTY HUB */}
-            {activeTab === 'PARTY_HUB' && (
-              <PartyHub 
-                partyStats={partyStats}
-                onSelectPartyTab={handleSelectPartyTab}
-                onApplyQuickFilter={handleApplyQuickFilter}
-                language={language}
-                t={t}
-              />
-            )}
-
-            {/* TAB CONTENT 2: DASHBOARD / BOOTHS REGISTRY */}
-            {(activeTab === 'DASHBOARD' || activeTab === 'BOOTHS') && (
-              <section className="registry-section">
-                {/* Registry Header */}
-                <div className="registry-header-bar">
-                  <div className="registry-title-wrap">
-                    <h2 className="registry-title">{t?.registry_title || 'Booth Performance Registry'}</h2>
-                    <p className="registry-subtitle">
-                      {t?.registry_subtitle || 'Detailed booth-by-booth vote tally, turnout, winners, and margin shifts across 58-Samrala'}
-                    </p>
-                  </div>
-
-                  <button 
-                    className="btn-registry-reset no-print"
-                    onClick={handleResetFilters}
-                    title="Reset all filters and search"
-                  >
-                    <span>{t?.reset_all || 'Reset All'}</span>
-                  </button>
-                </div>
-
-                {/* Party Selector Navigation Tabs */}
-                <div className="party-nav-tabs no-print">
-                  <button 
-                    className={`party-tab-btn ${selectedParty === 'ALL' ? 'active' : ''}`}
-                    onClick={() => handleSelectPartyTab('ALL')}
-                  >
-                    <span>{t?.tab_all || 'All 218 Booths'}</span>
-                    <span className="tab-count-pill">{allBooths.length}</span>
-                  </button>
-
-                  <button 
-                    className={`party-tab-btn inc ${selectedParty === 'INC' ? 'active' : ''}`}
-                    onClick={() => handleSelectPartyTab('INC')}
-                  >
-                    <span className="party-dot inc"></span>
-                    <span>{t?.tab_inc || 'INC Analysis'}</span>
-                    <span className="tab-count-pill">{summary.booths_won_2024?.INC || 100}</span>
-                  </button>
-
-                  <button 
-                    className={`party-tab-btn aap ${selectedParty === 'AAP' ? 'active' : ''}`}
-                    onClick={() => handleSelectPartyTab('AAP')}
-                  >
-                    <span className="party-dot aap"></span>
-                    <span>{t?.tab_aap || 'AAP Analysis'}</span>
-                    <span className="tab-count-pill">{summary.booths_won_2024?.AAP || 91}</span>
-                  </button>
-
-                  <button 
-                    className={`party-tab-btn sad ${selectedParty === 'SAD' ? 'active' : ''}`}
-                    onClick={() => handleSelectPartyTab('SAD')}
-                  >
-                    <span className="party-dot sad"></span>
-                    <span>{t?.tab_sad || 'SAD Analysis'}</span>
-                    <span className="tab-count-pill">{summary.booths_won_2024?.SAD || 19}</span>
-                  </button>
-
-                  <button 
-                    className={`party-tab-btn bjp ${selectedParty === 'BJP' ? 'active' : ''}`}
-                    onClick={() => handleSelectPartyTab('BJP')}
-                  >
-                    <span className="party-dot bjp"></span>
-                    <span>{t?.tab_bjp || 'BJP Analysis'}</span>
-                    <span className="tab-count-pill">{summary.booths_won_2024?.BJP || 8}</span>
-                  </button>
-                </div>
-
-                {/* Sub-Filters & Controls Toolbar */}
-                <div className="registry-toolbar no-print">
-                  {/* Left: Quick Filters */}
-                  <div className="toolbar-quick-filters">
-                    {selectedParty === 'ALL' ? (
-                      <>
-                        <button 
-                          className={`pill-filter ${partyFilter === 'ALL' ? 'active' : ''}`}
-                          onClick={() => setPartyFilter('ALL')}
-                        >
-                          {t?.filter_all || 'All'}
-                        </button>
-                        <button 
-                          className={`pill-filter inc ${partyFilter === 'INC_WINS' ? 'active' : ''}`}
-                          onClick={() => setPartyFilter('INC_WINS')}
-                        >
-                          {t?.filter_inc_wins || 'INC Wins (100)'}
-                        </button>
-                        <button 
-                          className={`pill-filter aap ${partyFilter === 'AAP_WINS' ? 'active' : ''}`}
-                          onClick={() => setPartyFilter('AAP_WINS')}
-                        >
-                          {t?.filter_aap_wins || 'AAP Wins (91)'}
-                        </button>
-                        <button 
-                          className={`pill-filter sad ${partyFilter === 'SAD_WINS' ? 'active' : ''}`}
-                          onClick={() => setPartyFilter('SAD_WINS')}
-                        >
-                          {t?.filter_sad_wins || 'SAD Wins (19)'}
-                        </button>
-                        <button 
-                          className={`pill-filter bjp ${partyFilter === 'BJP_WINS' ? 'active' : ''}`}
-                          onClick={() => setPartyFilter('BJP_WINS')}
-                        >
-                          {t?.filter_bjp_wins || 'BJP Wins (8)'}
-                        </button>
-                        <button 
-                          className={`pill-filter flip ${partyFilter === 'FLIPPED_ONLY' ? 'active' : ''}`}
-                          onClick={() => setPartyFilter('FLIPPED_ONLY')}
-                        >
-                          {t?.filter_flipped || 'Flipped (104)'}
-                        </button>
-                        <button 
-                          className={`pill-filter retain ${partyFilter === 'RETAINED_ONLY' ? 'active' : ''}`}
-                          onClick={() => setPartyFilter('RETAINED_ONLY')}
-                        >
-                          {t?.filter_retained || 'Retained (114)'}
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button 
-                          className={`pill-filter ${categoryFilter === 'ALL' ? 'active' : ''}`}
-                          onClick={() => setCategoryFilter('ALL')}
-                        >
-                          {t?.filter_all || 'All'}
-                        </button>
-                        <button 
-                          className={`pill-filter ${categoryFilter === 'WON_BOTH' ? 'active' : ''}`}
-                          onClick={() => setCategoryFilter('WON_BOTH')}
-                        >
-                          {isPa ? 'ਪੱਕੇ ਗੜ੍ਹ (ਦੋਵੇਂ ਜਿੱਤੇ)' : 'Strongholds (Won Both)'}
-                        </button>
-                        <button 
-                          className={`pill-filter ${categoryFilter === 'GAINED' ? 'active' : ''}`}
-                          onClick={() => setCategoryFilter('GAINED')}
-                        >
-                          {isPa ? 'ਨਵੇਂ ਜਿੱਤੇ (2024)' : 'Gained in 2024'}
-                        </button>
-                        <button 
-                          className={`pill-filter ${categoryFilter === 'LOST_24' ? 'active' : ''}`}
-                          onClick={() => setCategoryFilter('LOST_24')}
-                        >
-                          {isPa ? 'ਗਵਾਏ ਬੂਥ (2024)' : 'Lost in 2024'}
-                        </button>
-                        <button 
-                          className={`pill-filter ${categoryFilter === 'WEAK' ? 'active' : ''}`}
-                          onClick={() => setCategoryFilter('WEAK')}
-                        >
-                          {isPa ? 'ਕਮਜ਼ੋਰ ਬੂਥ (<20%)' : 'Weak (<20%)'}
-                        </button>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Right: Custom Dropdown Sort Selector */}
-                  <div className="toolbar-controls-right">
-                    <CustomDropdown 
-                      options={sortOptions}
-                      value={sortBy}
-                      onChange={setSortBy}
-                      label={t?.sort_order_label || 'Sort order'}
-                    />
-                  </div>
-                </div>
-
-                {/* Booth Grid / Table Display */}
-                <BoothGrid 
-                  booths={filteredBooths}
-                  selectedParty={selectedParty}
-                  onSelectBooth={setSelectedBooth}
-                  partyFilter={selectedParty === 'ALL' ? partyFilter : categoryFilter}
-                  searchQuery={searchQuery}
-                  onClearSearch={() => setSearchQuery('')}
-                  language={language}
-                  t={t}
+            {/* Search & Sort Sub-Toolbar */}
+            <div className="registry-toolbar">
+              <div className="toolbar-search-wrap">
+                <Search size={15} />
+                <input
+                  type="text"
+                  className="toolbar-search-input"
+                  placeholder={
+                    language === 'pa'
+                      ? `ਬੂਥ ਨੰਬਰ ਜਾਂ ਪਿੰਡ ਦੇ ਨਾਮ ਨਾਲ ਖੋਜੋ (${currentConst.total_booths} ਬੂਥ)...`
+                      : `Search all ${currentConst.total_booths} booths by number or village...`
+                  }
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  aria-label="Filter booths"
                 />
-              </section>
-            )}
-          </div>
+              </div>
+
+              <div className="toolbar-controls">
+                <button
+                  onClick={handlePrintMasterReport}
+                  className="btn-toolbar-pdf"
+                  title="Export Current Table View as PDF with Dsidein Watermark"
+                >
+                  <Printer size={14} />
+                  <span>{t('print_pdf', language)}</span>
+                </button>
+
+                <CustomDropdown
+                  value={sortBy}
+                  onChange={setSortBy}
+                  options={sortOptions}
+                  label="Sort order"
+                />
+              </div>
+            </div>
+
+            {/* Booth Table / Grid */}
+            <BoothGrid 
+              booths={filteredBooths}
+              selectedParty={selectedParty}
+              partyFilter={partyFilter}
+              onSelectBooth={(b) => setSelectedBooth(b)}
+              onExportBoothPdf={handleExportBoothPdf}
+              language={language}
+            />
+          </section>
         </main>
       </div>
 
-      {/* 4. Modals */}
+      {/* Booth Inspector Modal */}
       {selectedBooth && (
         <BoothModal 
           booth={selectedBooth}
           onClose={() => setSelectedBooth(null)}
+          constituencyId={constituencyId}
           language={language}
-          t={t}
         />
       )}
 
+      {/* Renumbering & Alignment Audit Modal */}
       {auditModalOpen && (
-        <RenumberingAuditModal 
+        <RenumberingAuditModal
           isOpen={auditModalOpen}
           onClose={() => setAuditModalOpen(false)}
-          auditData={summary.renumbering_audit}
-          booths={allBooths}
-          t={t}
-          isPa={isPa}
+          booths={booths}
+          language={language}
         />
       )}
     </div>

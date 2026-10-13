@@ -6,17 +6,21 @@ import {
   Search
 } from 'lucide-react';
 
-export default function RenumberingAuditModal({ isOpen, onClose, auditData, booths = [], t, isPa }) {
+export default function RenumberingAuditModal({ isOpen, onClose, auditData, booths = [], language = 'en', isPa }) {
   const [search, setSearch] = useState('');
 
   if (!isOpen) return null;
+
+  const isPunjabi = isPa ?? (language === 'pa');
+  const isPaFinal = isPunjabi;
+  isPa = isPunjabi;
 
   const filteredBooths = booths.filter(b => {
     if (!search) return true;
     const q = search.toLowerCase();
     return b.booth_no.toString().includes(q) || 
-           (b.village_en && b.village_en.toLowerCase().includes(q)) ||
-           (b.village_pa && b.village_pa.includes(q));
+           ((b.village_en || b.village_english) && (b.village_en || b.village_english).toLowerCase().includes(q)) ||
+           ((b.village_pa || b.village_punjabi) && (b.village_pa || b.village_punjabi).includes(q));
   });
 
   return (
